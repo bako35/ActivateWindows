@@ -12,14 +12,12 @@
 #include "shellapi.h"
 #include "resource.h"
 
-#define MAX_LOADSTRING 100
+#define APP_NAME L"Activate Windows 10/11"
 
 ITaskbarList3* pTaskbar = nullptr;
 
 // Zmienne globalne:
 HINSTANCE hInst;                                // bieżące wystąpienie
-WCHAR szTitle[MAX_LOADSTRING];                  // Tekst paska tytułu
-WCHAR szWindowClass[MAX_LOADSTRING];            // nazwa klasy okna głównego
 HFONT hNormalFont = CreateFont(18, 0, 0, 0, FW_DONTCARE, 0, 0, 0, ANSI_CHARSET, OUT_DEFAULT_PRECIS, OUT_DEFAULT_PRECIS, PROOF_QUALITY, DEFAULT_PITCH, L"Segoe UI"); // czcionka
 RECT rc;
 SHELLEXECUTEINFO idx01, idx02, idx03, idx11, idx12, idx13, idx21, idx22, idx23, idx31, idx32, idx33, idx41, idx42, idx43, idx51, idx52, idx53, idx61, idx62, idx63, idx71, idx72, idx73, idx81, idx82, idx83, idx91, idx92, idx93;
@@ -65,12 +63,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     // TODO: W tym miejscu umieść kod.
 
     // Inicjuj ciągi globalne
-    LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_ACTIVATEWINDOWS, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
     if (!Is_Win10_or_Later()) {
-        MessageBox(NULL, L"You must have Windows 10 or Windows 11 to run the program", szTitle, MB_ICONERROR);
+        MessageBox(NULL, L"You must have Windows 10 or Windows 11 to run the program", APP_NAME, MB_ICONERROR);
+        PostQuitMessage(0);
+        return 0;
+    }
+
+    HANDLE hMutex = CreateMutex(NULL, FALSE, L"AW10/11");
+    if (hMutex && GetLastError() != 0) {
+        MessageBox(NULL, L"This application is already running", APP_NAME, MB_ICONEXCLAMATION);
+        PostQuitMessage(0);
+        return 0;
+    }
+
+    // Test arguemntu
+    if (wcsstr(lpCmdLine, L"-bako")) {
+        MessageBox(NULL, L"Kurwa działa xD", L"To działa lol", MB_ICONINFORMATION);
         PostQuitMessage(0);
         return 0;
     }
@@ -81,18 +91,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
         return FALSE;
     }
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_ACTIVATEWINDOWS));
-
     MSG msg;
 
     // Główna pętla komunikatów:
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
     return (int) msg.wParam;
@@ -118,10 +123,11 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hInstance      = hInstance;
     wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ACTIVATEWINDOWS));
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_ACTIVATEWINDOWS);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_ACTIVATEWINDOWS));
+    //wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+    wcex.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+    wcex.lpszMenuName   = nullptr;
+    wcex.lpszClassName  = L"ACTIVATEWINDOWS";
+    wcex.hIconSm        = nullptr;
 
     return RegisterClassExW(&wcex);
 }
@@ -140,7 +146,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Przechowuj dojście wystąpienia w naszej zmiennej globalnej
 
-   hwnd = CreateWindowEx(0, szWindowClass, szTitle, WS_SYSMENU|WS_MINIMIZEBOX, 0, 0, 330, 255, NULL, NULL, hInstance, NULL);
+   hwnd = CreateWindowEx(0, L"ACTIVATEWINDOWS", APP_NAME, WS_SYSMENU|WS_MINIMIZEBOX, 0, 0, 330, 255, NULL, NULL, hInstance, NULL);
    hActiveB = CreateWindowEx(0, L"BUTTON", L"Activate", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 108, 180, 100, 30, hwnd, (HMENU)1, hInstance, NULL);
    hActivePro = CreateWindowEx(0, PROGRESS_CLASS, 0, WS_CHILD | WS_VISIBLE, 5, 150, 305, 25, hwnd, 0, hInstance, 0);
    hActiveVerWin = CreateWindowEx(WS_EX_CLIENTEDGE, L"COMBOBOX", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST, 10, 45, 295, 200, hwnd, NULL, hInstance, NULL);
@@ -227,8 +233,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 0) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx01.cbSize = sizeof(SHELLEXECUTEINFO);
             idx01.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx01.hwnd = NULL;
@@ -281,13 +287,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 0) {
@@ -298,8 +304,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 1) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx11.cbSize = sizeof(SHELLEXECUTEINFO);
             idx11.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx11.hwnd = NULL;
@@ -352,13 +358,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 1) {
@@ -369,8 +375,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 2) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx21.cbSize = sizeof(SHELLEXECUTEINFO);
             idx21.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx21.hwnd = NULL;
@@ -423,13 +429,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 2) {
@@ -440,8 +446,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 3) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx31.cbSize = sizeof(SHELLEXECUTEINFO);
             idx31.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx31.hwnd = NULL;
@@ -494,13 +500,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 3) {
@@ -511,8 +517,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 4) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx41.cbSize = sizeof(SHELLEXECUTEINFO);
             idx41.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx41.hwnd = NULL;
@@ -565,13 +571,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 4) {
@@ -582,8 +588,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 5) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx51.cbSize = sizeof(SHELLEXECUTEINFO);
             idx51.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx51.hwnd = NULL;
@@ -636,13 +642,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 5) {
@@ -653,8 +659,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 6) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx61.cbSize = sizeof(SHELLEXECUTEINFO);
             idx61.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx61.hwnd = NULL;
@@ -707,13 +713,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 6) {
@@ -724,8 +730,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 7) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx71.cbSize = sizeof(SHELLEXECUTEINFO);
             idx71.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx71.hwnd = NULL;
@@ -778,13 +784,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 7) {
@@ -795,8 +801,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 8) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx81.cbSize = sizeof(SHELLEXECUTEINFO);
             idx81.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx81.hwnd = NULL;
@@ -849,13 +855,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 8) {
@@ -866,8 +872,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if ((HWND)lParam == hActiveB && index == 9) {
             EnableWindow(hActiveB, FALSE);
             EnableWindow(hActiveVerWin, FALSE);
-            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
-            pTaskbar->SetProgressValue(hwnd, 0, 3);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
             idx91.cbSize = sizeof(SHELLEXECUTEINFO);
             idx91.fMask = SEE_MASK_NOCLOSEPROCESS;
             idx91.hwnd = NULL;
@@ -920,13 +926,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
                 pTaskbar->SetProgressValue(hwnd, 3, 3);
                 FlashWindow(hwnd, TRUE);
-                MessageBox(hwnd, L"An error occurred while activating Windows", szTitle, MB_ICONERROR | MB_APPLMODAL);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
                 EnableWindow(hActiveB, TRUE);
                 EnableWindow(hActiveVerWin, TRUE);
             }
             else {
                 FlashWindow(hwnd, TRUE);
-                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", szTitle, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
             }
         }
         if ((HWND)lParam == hActiveVerWin && index == 9) {
