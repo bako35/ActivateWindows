@@ -1,5 +1,5 @@
 # Activate Windows 10/11
-![ActivateWindows Logo](https://raw.githubusercontent.com/bako35/ActivateWindows/refs/heads/main/ActivateWindowsScreen.png)
+![ActivateWindows Logo](https://raw.githubusercontent.com/bako35/ActivateWindows/refs/heads/main/ActivateWindowsScreenNew.png)
 
 Activator activates Windows using three commands:
 
