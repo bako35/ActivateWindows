@@ -1,7 +1,5 @@
-﻿// ActivateWindows.cpp : Definiuje punkt wejścia dla aplikacji.
-//
-#pragma comment(lib, "Ole32.lib")
-#pragma comment(lib, "Shell32.lib")
+﻿//#pragma comment(lib, "Ole32.lib")
+//#pragma comment(lib, "Shell32.lib")
 
 #include "framework.h"
 #include "windows.h"
@@ -11,8 +9,12 @@
 #include "shobjidl.h"
 #include "shellapi.h"
 #include "resource.h"
+#include <string>
 
 #define APP_NAME L"Activate Windows 10/11"
+
+std::wstring CustomKey;
+std::wstring CustomKMS;
 
 ITaskbarList3* pTaskbar = nullptr;
 
@@ -20,14 +22,15 @@ ITaskbarList3* pTaskbar = nullptr;
 HINSTANCE hInst;                                // bieżące wystąpienie
 HFONT hNormalFont = CreateFont(18, 0, 0, 0, FW_DONTCARE, 0, 0, 0, ANSI_CHARSET, OUT_DEFAULT_PRECIS, OUT_DEFAULT_PRECIS, PROOF_QUALITY, DEFAULT_PITCH, L"Segoe UI"); // czcionka
 RECT rc;
-SHELLEXECUTEINFO idx01, idx02, idx03, idx11, idx12, idx13, idx21, idx22, idx23, idx31, idx32, idx33, idx41, idx42, idx43, idx51, idx52, idx53, idx61, idx62, idx63, idx71, idx72, idx73, idx81, idx82, idx83, idx91, idx92, idx93;
-HWND hwnd, hActiveB, hActivePro, hActiveVerWin, hActiveFrame, hActiveStringWindows, hActiveStringKey1, hActiveStringKey2, hActiveStringKMS1, hActiveStringKMS2, hActiveBCheck, hActiveAbout;
+SHELLEXECUTEINFO idx01, idx02, idx03, idx11, idx12, idx13, idx21, idx22, idx23, idx31, idx32, idx33, idx41, idx42, idx43, idx51, idx52, idx53, idx61, idx62, idx63, idx71, idx72, idx73, idx81, idx82, idx83, idx91, idx92, idx93, idx101, idx102, idx103;
+HWND hwnd, hActiveB, hActivePro, hActiveVerWin, hActiveFrame, hActiveStringWindows, hActiveStringKey1, hActiveStringKey2, hActiveStringKMS1, hActiveStringKMS2, hActiveBCheck, hActiveAbout, hActiveSettings;
 
 // Przekaż dalej deklaracje funkcji dołączone w tym module kodu:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
 
 BOOL Is_Win10_or_Later() {
     OSVERSIONINFOEX osvi;
@@ -65,10 +68,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     // Inicjuj ciągi globalne
     MyRegisterClass(hInstance);
 
-    if (!Is_Win10_or_Later()) {
-        MessageBox(NULL, L"You must have Windows 10 or Windows 11 to run the program", APP_NAME, MB_ICONERROR);
-        PostQuitMessage(0);
-        return 0;
+    if (!wcsstr(lpCmdLine, L"-skipcheck")) {
+        if (!Is_Win10_or_Later()) {
+            MessageBox(NULL, L"You must have Windows 10 or Windows 11 to run the program", APP_NAME, MB_ICONERROR);
+            PostQuitMessage(0);
+            return 0;
+        }
     }
 
     HANDLE hMutex = CreateMutex(NULL, FALSE, L"AW10/11");
@@ -79,11 +84,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     }
 
     // Test arguemntu
-    if (wcsstr(lpCmdLine, L"-bako")) {
+    /*if (wcsstr(lpCmdLine, L"-bako")) {
         MessageBox(NULL, L"Kurwa działa xD", L"To działa lol", MB_ICONINFORMATION);
         PostQuitMessage(0);
         return 0;
-    }
+    }*/
 
     // Wykonaj inicjowanie aplikacji:
     if (!InitInstance (hInstance, nCmdShow))
@@ -146,8 +151,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Przechowuj dojście wystąpienia w naszej zmiennej globalnej
 
-   hwnd = CreateWindowEx(0, L"ACTIVATEWINDOWS", APP_NAME, WS_SYSMENU|WS_MINIMIZEBOX, 0, 0, 330, 255, NULL, NULL, hInstance, NULL);
-   hActiveB = CreateWindowEx(0, L"BUTTON", L"Activate", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 108, 180, 100, 30, hwnd, (HMENU)1, hInstance, NULL);
+   hwnd = CreateWindowEx(0, L"ACTIVATEWINDOWS", APP_NAME, WS_SYSMENU, 0, 0, 330, 255, NULL, NULL, hInstance, NULL);
+   hActiveB = CreateWindowEx(0, L"BUTTON", L"Activate", WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_DISABLED | BS_DEFPUSHBUTTON, 108, 180, 100, 30, hwnd, (HMENU)1, hInstance, NULL);
    hActivePro = CreateWindowEx(0, PROGRESS_CLASS, 0, WS_CHILD | WS_VISIBLE, 5, 150, 305, 25, hwnd, 0, hInstance, 0);
    hActiveVerWin = CreateWindowEx(WS_EX_CLIENTEDGE, L"COMBOBOX", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST, 10, 45, 295, 200, hwnd, NULL, hInstance, NULL);
    hActiveFrame = CreateWindowEx(0, L"BUTTON", L"Information", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 5, 5, 305, 143, hwnd, (HMENU)2, hInstance, NULL);
@@ -158,6 +163,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    hActiveStringKMS2 = CreateWindowEx(0, L"STATIC", NULL, WS_CHILD | WS_VISIBLE | SS_CENTER, 10, 127, 295, 15, hwnd, NULL, hInstance, NULL);
    hActiveBCheck = CreateWindowEx(0, L"BUTTON", L"Check", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 210, 180, 100, 30, hwnd, (HMENU)3, hInstance, NULL);
    hActiveAbout = CreateWindowEx(0, L"BUTTON", L"About", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 5, 180, 100, 30, hwnd, (HMENU)4, hInstance, NULL);
+   hActiveSettings = CreateWindowEx(0, L"BUTTON", L"Setings", WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_DISABLED, 210, 5, 100, 30, hwnd, (HMENU)5, hInstance, NULL);
 
    SendMessage(hActivePro, PBM_SETRANGE, 0, (LPARAM)MAKELONG(0, 99));
    SendMessage(hActivePro, PBM_SETSTEP, (WPARAM)33, 0);
@@ -171,6 +177,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    SendMessage(hActiveVerWin, CB_ADDSTRING, 0, (LPARAM)L"Windows 10/11 Home Single Language");
    SendMessage(hActiveVerWin, CB_ADDSTRING, 0, (LPARAM)L"Windows 10/11 Pro");
    SendMessage(hActiveVerWin, CB_ADDSTRING, 0, (LPARAM)L"Windows 10/11 Pro N");
+   SendMessage(hActiveVerWin, CB_ADDSTRING, 0, (LPARAM)L"Custom...");
    SendMessage(hActiveVerWin, WM_SETFONT, (WPARAM)hNormalFont, 0);
    SendMessage(hActiveFrame, WM_SETFONT, (WPARAM)hNormalFont, 0);
    SendMessage(hActiveStringWindows, WM_SETFONT, (WPARAM)hNormalFont, 0);
@@ -181,14 +188,13 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    SendMessage(hActiveB, WM_SETFONT, (WPARAM)hNormalFont, 0);
    SendMessage(hActiveBCheck, WM_SETFONT, (WPARAM)hNormalFont, 0);
    SendMessage(hActiveAbout, WM_SETFONT, (WPARAM)hNormalFont, 0);
+   SendMessage(hActiveSettings, WM_SETFONT, (WPARAM)hNormalFont, 0);
 
    SetWindowText(hActiveStringWindows, L"Windows:");
    SetWindowText(hActiveStringKey1, L"Key:");
    SetWindowText(hActiveStringKey2, L"XXXXX-XXXXX-XXXXX-XXXXX-XXXXX");
    SetWindowText(hActiveStringKMS1, L"KMS:");
    SetWindowText(hActiveStringKMS2, L"example.com");
-
-   EnableWindow(hActiveB, FALSE);
 
    GetWindowRect(hwnd, &rc);
    int xPos = (GetSystemMetrics(SM_CXSCREEN) - rc.right) / 2;
@@ -226,9 +232,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_COMMAND:
         if (LOWORD(wParam) == 4) {
             DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd, About);
-            }
+        }
         if (LOWORD(wParam) == 3) {
             ShellExecute(NULL, L"open", L"C:\\Windows\\system32\\cmd.exe", L"/c slmgr /dli && slmgr /xpr", NULL, SW_HIDE);
+        }
+        if (LOWORD(wParam) == 5) {
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTINGS), hwnd, Settings);
         }
         if ((HWND)lParam == hActiveB && index == 0) {
             EnableWindow(hActiveB, FALSE);
@@ -300,6 +309,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"NW6C2-QMPVW-D7KKK-3GKT6-VCFB2");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 1) {
             EnableWindow(hActiveB, FALSE);
@@ -371,6 +381,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"2WH4N-8QGBV-H22JP-CT43Q-MDWWJ");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 2) {
             EnableWindow(hActiveB, FALSE);
@@ -442,6 +453,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"NPPR9-FWDCX-D2C8J-H872K-2YT43");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 3) {
             EnableWindow(hActiveB, FALSE);
@@ -513,6 +525,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"DPH2V-TTNVB-4X9Q3-TJR4H-KHJW4");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 4) {
             EnableWindow(hActiveB, FALSE);
@@ -584,6 +597,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"PVMJN-6DFY6-9CCP6-7BKTT-D3WVR");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 5) {
             EnableWindow(hActiveB, FALSE);
@@ -655,6 +669,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"TX9XD-98N7V-6WMQ6-BX7FG-H8Q99");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 6) {
             EnableWindow(hActiveB, FALSE);
@@ -726,6 +741,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"3KHY7-WNT83-DGQKR-F7HPR-844BM");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 7) {
             EnableWindow(hActiveB, FALSE);
@@ -797,6 +813,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"7HNRX-D7KGG-3K4RQ-4WPJ4-YTDFH");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 8) {
             EnableWindow(hActiveB, FALSE);
@@ -868,6 +885,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"W269N-WFGWX-YVC9B-4J6C9-T83GX");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
         }
         if ((HWND)lParam == hActiveB && index == 9) {
             EnableWindow(hActiveB, FALSE);
@@ -939,6 +957,84 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             SetWindowText(hActiveStringKey2, L"MH37W-N47XK-V7XM9-C7227-GCQG9");
             SetWindowText(hActiveStringKMS2, L"kms.digiboy.ir");
             EnableWindow(hActiveB, TRUE);
+            EnableWindow(hActiveSettings, FALSE);
+        }
+        if ((HWND)lParam == hActiveB && index == 10) {
+            std::wstring paramsKey = L"/c slmgr /ipk " + CustomKey;
+            std::wstring paramsKMS = L"/c slmgr /ipk " + CustomKMS;
+
+            EnableWindow(hActiveB, FALSE);
+            EnableWindow(hActiveVerWin, FALSE);
+            EnableWindow(hActiveSettings, FALSE);
+            pTaskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+            //pTaskbar->SetProgressValue(hwnd, 0, 3);
+            idx101.cbSize = sizeof(SHELLEXECUTEINFO);
+            idx101.fMask = SEE_MASK_NOCLOSEPROCESS;
+            idx101.hwnd = NULL;
+            idx101.lpVerb = L"runas";
+            idx101.lpFile = L"C:\\Windows\\system32\\cmd.exe";
+            idx101.lpParameters = paramsKey.c_str();
+            idx101.lpDirectory = NULL;
+            idx101.nShow = SW_HIDE;
+            idx101.hInstApp = NULL;
+            ShellExecuteEx(&idx101);
+            WaitForSingleObject(idx101.hProcess, INFINITE);
+            CloseHandle(idx101.hProcess);
+            SendMessage(hActivePro, PBM_STEPIT, 0, 0);
+            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
+            pTaskbar->SetProgressValue(hwnd, 1, 3);
+
+            idx102.cbSize = sizeof(SHELLEXECUTEINFO);
+            idx102.fMask = SEE_MASK_NOCLOSEPROCESS;
+            idx102.hwnd = NULL;
+            idx102.lpVerb = L"runas";
+            idx102.lpFile = L"C:\\Windows\\system32\\cmd.exe";
+            idx102.lpParameters = paramsKMS.c_str();
+            idx102.lpDirectory = NULL;
+            idx102.nShow = SW_HIDE;
+            idx102.hInstApp = NULL;
+            ShellExecuteEx(&idx102);
+            WaitForSingleObject(idx102.hProcess, INFINITE);
+            CloseHandle(idx102.hProcess);
+            SendMessage(hActivePro, PBM_STEPIT, 0, 0);
+            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
+            pTaskbar->SetProgressValue(hwnd, 2, 3);
+
+            idx103.cbSize = sizeof(SHELLEXECUTEINFO);
+            idx103.fMask = SEE_MASK_NOCLOSEPROCESS;
+            idx103.hwnd = NULL;
+            idx103.lpVerb = L"runas";
+            idx103.lpFile = L"C:\\Windows\\system32\\cmd.exe";
+            idx103.lpParameters = L"/c slmgr /ato";
+            idx103.lpDirectory = NULL;
+            idx103.nShow = SW_HIDE;
+            idx103.hInstApp = NULL;
+            ShellExecuteEx(&idx103);
+            WaitForSingleObject(idx103.hProcess, INFINITE);
+            CloseHandle(idx103.hProcess);
+            SendMessage(hActivePro, PBM_STEPIT, 0, 0);
+            pTaskbar->SetProgressState(hwnd, TBPF_NORMAL);
+            pTaskbar->SetProgressValue(hwnd, 3, 3);
+
+            if (GetLastError() != 0) {
+                pTaskbar->SetProgressState(hwnd, TBPF_ERROR);
+                pTaskbar->SetProgressValue(hwnd, 3, 3);
+                FlashWindow(hwnd, TRUE);
+                MessageBox(hwnd, L"An error occurred while activating Windows", APP_NAME, MB_ICONERROR | MB_APPLMODAL);
+                EnableWindow(hActiveB, TRUE);
+                EnableWindow(hActiveVerWin, TRUE);
+                EnableWindow(hActiveSettings, TRUE);
+            }
+            else {
+                FlashWindow(hwnd, TRUE);
+                msgboxid = MessageBox(hwnd, L"Do you want to open activation settings?", APP_NAME, MB_ICONINFORMATION | MB_APPLMODAL | MB_YESNO);
+            }
+        }
+        if ((HWND)lParam == hActiveVerWin && index == 10) {
+            SetWindowText(hActiveStringKey2, L"Custom Key");
+            SetWindowText(hActiveStringKMS2, L"Custom KMS");
+            EnableWindow(hActiveB, FALSE);
+            EnableWindow(hActiveSettings, TRUE);
         }
         switch (msgboxid)
         {
@@ -986,6 +1082,42 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         if (LOWORD(wParam) == IDYES) {
             ShellExecute(NULL, L"open", L"http://github.com/bako35", NULL, NULL, SW_NORMAL);
             EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
+}
+
+INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    wchar_t* szKeyText;
+    wchar_t* szKmsText;
+    wchar_t bufferKey[256];
+    wchar_t bufferKMS[256];
+
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK)
+        {
+            GetDlgItemText(hDlg, IDC_EDIT1, bufferKey, 256);
+            GetDlgItemText(hDlg, IDC_EDIT2, bufferKMS, 256);
+            CustomKey = bufferKey;
+            CustomKMS = bufferKMS;
+            SetWindowText(hActiveStringKey2, CustomKey.c_str());
+            SetWindowText(hActiveStringKMS2, CustomKMS.c_str());
+            EnableWindow(hActiveB, TRUE);
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        if (LOWORD(wParam) == IDCANCEL) {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
         }
         break;
     }
